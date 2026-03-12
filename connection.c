@@ -4,6 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 
+void parse_request(char *raw, char *method, char *path); // forward declaration
+
 int main() {
     int sockfd;
     // Create socket
@@ -21,7 +23,7 @@ int main() {
         .sin_port = htons(8080), //Port number (convert to network byte order)
         .sin_addr.s_addr = INADDR_ANY,
     };
-
+    // Set socket options to allow reuse of address and port
     int opt = 1;
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
@@ -43,4 +45,38 @@ int main() {
         perror("accept");
         return 1;
     }
+    char buffer[1024]; // Buffer to hold incoming request
+    char method[16]; // Buffer to hold HTTP method (e.g., GET, POST)
+    char path[256]; // Buffer to hold requested path (e.g., /index.html
+    
+    if (recv(clientfd, buffer, sizeof(buffer), 0) < 0) {
+        perror("recv");
+        return 1;
+    }
+    parse_request(buffer, method, path);
+    printf("Method: %s, Path: %s\n", method, path);
+    close(clientfd);
+    close(sockfd);
+    return 0;
+
+}
+/**
+ * Parses an HTTP request line to extract the method and path.
+ *
+ * @param raw    The raw HTTP request line (e.g., "GET /index.html HTTP/1.1").
+ *               This string will be modified by the function.
+ * @param method Buffer to store the extracted HTTP method (e.g., "GET").
+ * @param path   Buffer to store the extracted request path (e.g., "/index.html").
+ *
+ * @note The function uses strtok to tokenize the input string and assumes
+ *       that the method and path are separated by spaces. The input string
+ *       'raw' will be modified during parsing.
+ */
+void parse_request(char *raw, char *method, char *path) 
+{
+    char *token = strtok(raw, " ");  // returns pointer to "GET"
+    strcpy(method, token);            // copy it into your method buffer
+    
+    token = strtok(NULL, " ");       // returns pointer to "/index.html"
+    strcpy(path, token);              // copy it into your path buffer
 }
