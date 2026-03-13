@@ -36,6 +36,7 @@ int main() {
         perror("listen");
         return 1;
     }
+    while (1) {
     // Accept a connection (blocking call)
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
@@ -55,7 +56,10 @@ int main() {
     }
     parse_request(buffer, method, path);
     printf("Method: %s, Path: %s\n", method, path);
+    char response[] = "HTTP/1.1 200 OK\r\n\r\nHello, World!";
+    send(clientfd, response, strlen(response), 0);
     close(clientfd);
+    }
     close(sockfd);
     return 0;
 
