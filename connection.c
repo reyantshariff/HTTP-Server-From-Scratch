@@ -56,13 +56,26 @@ int main() {
     }
     parse_request(buffer, method, path);
     printf("Method: %s, Path: %s\n", method, path);
-    char response[] = "HTTP/1.1 200 OK\r\n\r\nHello, World!";
+    FILE *f = fopen("index.html", "r");
+    if (f == NULL) {
+    // file not found → send 404
+    char response[] = "HTTP/1.1 404 Not Found\r\n\r\nFile Not Found";
     send(clientfd, response, strlen(response), 0);
+    }
+    else 
+    {
+        // file found → send 200 + file contents
+        char response_header[] = "HTTP/1.1 200 OK\r\n\r\n";
+        send(clientfd, response_header, strlen(response_header), 0);
+
+        char file_buffer[1024];
+        int bytes_read = fread(file_buffer, 1, sizeof(file_buffer), f);
+        send(clientfd, file_buffer, bytes_read, 0);
+    } 
     close(clientfd);
     }
     close(sockfd);
     return 0;
-
 }
 /**
  * Parses an HTTP request line to extract the method and path.
