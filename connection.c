@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 void parse_request(char *raw, char *method, char *path); // forward declaration
+void resolve_path(char *path, char *filepath); // forward declaration
 
 int main() {
     int sockfd;
@@ -16,7 +17,6 @@ int main() {
         perror("socket");
         return 1;
     }
-
     // Set up server address structure
     struct sockaddr_in server_addr={
         .sin_family = AF_INET, //IPV4
@@ -56,7 +56,10 @@ int main() {
     }
     parse_request(buffer, method, path);
     printf("Method: %s, Path: %s\n", method, path);
-    FILE *f = fopen("index.html", "r");
+    //FILE *f = fopen("index.html", "r");
+    char filepath[256];
+    resolve_path(path, filepath);
+    FILE *f = fopen(filepath, "r");
     if (f == NULL) {
     // file not found → send 404
     char response[] = "HTTP/1.1 404 Not Found\r\n\r\nFile Not Found";
@@ -96,4 +99,21 @@ void parse_request(char *raw, char *method, char *path)
     
     token = strtok(NULL, " ");       // returns pointer to "/index.html"
     strcpy(path, token);              // copy it into your path buffer
+}
+/**
+ * Resolves a URL path to a local file path.
+ *
+ * If the path is "/", it sets the filepath to "index.html".
+ * Otherwise, it strips the leading '/' from the path and uses the remainder as the filename.
+ *
+ * @param path     The URL path to resolve (e.g., "/about.html").
+ * @param filepath The buffer to store the resolved file path.
+ */
+void resolve_path(char *path, char *filepath) {
+    if (strcmp(path, "/") == 0) {
+        strcpy(filepath, "index.html");
+    } else {
+        // strip the leading / and use the rest as the filename
+        strcpy(filepath, path + 1);  // path + 1 skips the first character
+    }
 }
