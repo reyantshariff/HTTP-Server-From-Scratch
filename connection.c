@@ -60,6 +60,7 @@ int main() {
     char filepath[256];
     resolve_path(path, filepath);
     FILE *f = fopen(filepath, "r");
+
     if (f == NULL) {
     // file not found → send 404
     char response[] = "HTTP/1.1 404 Not Found\r\n\r\nFile Not Found";
@@ -67,8 +68,11 @@ int main() {
     }
     else 
     {
-        // file found → send 200 + file contents
-        char response_header[] = "HTTP/1.1 200 OK\r\n\r\n";
+        fseek(f, 0, SEEK_END);  // jump to end of file
+        long filesize = ftell(f);  // get current position (= file size)
+        fseek(f, 0, SEEK_SET);  // jump back to beginning before reading
+        char response_header[256];
+        sprintf(response_header, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %ld\r\n\r\n", filesize);
         send(clientfd, response_header, strlen(response_header), 0);
 
         char file_buffer[1024];
