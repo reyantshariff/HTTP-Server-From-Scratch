@@ -3,9 +3,53 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdlib.h>   // for malloc and free
+#include <pthread.h>  // for pthread_create and pthread_detach
 
 void parse_request(char *raw, char *method, char *path); // forward declaration
 void resolve_path(char *path, char *filepath); // forward declaration
+
+void *handle_client(void *arg) {
+    int clientfd = *(int *)arg;
+    free(arg);   
+    // all your recv, parse, send logic goes here
+    char buffer[1024]; // Buffer to hold incoming request
+    char method[16]; // Buffer to hold HTTP method (e.g., GET, POST)
+    char path[256]; // Buffer to hold requested path (e.g., /index.html
+    
+    if (recv(clientfd, buffer, sizeof(buffer), 0) < 0) {
+        perror("recv");
+        return NULL;
+    }
+    parse_request(buffer, method, path);
+    printf("Method: %s, Path: %s\n", method, path);
+    //FILE *f = fopen("index.html", "r");
+    char filepath[256];
+    resolve_path(path, filepath);
+    FILE *f = fopen(filepath, "r");
+
+    if (f == NULL) {
+    // file not found → send 404
+    char response[] = "HTTP/1.1 404 Not Found\r\n\r\nFile Not Found";
+    send(clientfd, response, strlen(response), 0);
+    }
+    else 
+    {
+        fseek(f, 0, SEEK_END);  // jump to end of file
+        long filesize = ftell(f);  // get current position (= file size)
+        fseek(f, 0, SEEK_SET);  // jump back to beginning before reading
+        char response_header[256];
+        sprintf(response_header, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %ld\r\n\r\n", filesize);
+        send(clientfd, response_header, strlen(response_header), 0);
+
+        char file_buffer[1024];
+        int bytes_read = fread(file_buffer, 1, sizeof(file_buffer), f);
+        send(clientfd, file_buffer, bytes_read, 0);
+    } 
+    close(clientfd);
+    return NULL;
+}
+
 
 int main() {
     int sockfd;
@@ -36,6 +80,7 @@ int main() {
         perror("listen");
         return 1;
     }
+
     while (1) {
     // Accept a connection (blocking call)
     struct sockaddr_in client_addr;
@@ -46,40 +91,13 @@ int main() {
         perror("accept");
         return 1;
     }
-    char buffer[1024]; // Buffer to hold incoming request
-    char method[16]; // Buffer to hold HTTP method (e.g., GET, POST)
-    char path[256]; // Buffer to hold requested path (e.g., /index.html
+
+    pthread_t thread;
+    int *client_ptr = malloc(sizeof(int));
+    *client_ptr = clientfd;
+    pthread_create(&thread, NULL, handle_client, client_ptr);
+    pthread_detach(thread);
     
-    if (recv(clientfd, buffer, sizeof(buffer), 0) < 0) {
-        perror("recv");
-        return 1;
-    }
-    parse_request(buffer, method, path);
-    printf("Method: %s, Path: %s\n", method, path);
-    //FILE *f = fopen("index.html", "r");
-    char filepath[256];
-    resolve_path(path, filepath);
-    FILE *f = fopen(filepath, "r");
-
-    if (f == NULL) {
-    // file not found → send 404
-    char response[] = "HTTP/1.1 404 Not Found\r\n\r\nFile Not Found";
-    send(clientfd, response, strlen(response), 0);
-    }
-    else 
-    {
-        fseek(f, 0, SEEK_END);  // jump to end of file
-        long filesize = ftell(f);  // get current position (= file size)
-        fseek(f, 0, SEEK_SET);  // jump back to beginning before reading
-        char response_header[256];
-        sprintf(response_header, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %ld\r\n\r\n", filesize);
-        send(clientfd, response_header, strlen(response_header), 0);
-
-        char file_buffer[1024];
-        int bytes_read = fread(file_buffer, 1, sizeof(file_buffer), f);
-        send(clientfd, file_buffer, bytes_read, 0);
-    } 
-    close(clientfd);
     }
     close(sockfd);
     return 0;
